@@ -34,7 +34,9 @@ public class NotesController : ControllerBase
         var user = BasicAuthenticationHandler.GetUserFrom(authorizationHeader);
 
         return _database.Notes
-            .FromSqlRaw($"SELECT * FROM Notes WHERE Author='{user.Username}' AND Content LIKE '%{containing}%' ORDER BY Id")
+            .Where(note => note.Author == user.Username)
+            .Where(note => string.IsNullOrEmpty(containing) ? true : note.Content.Contains(containing))
+            .OrderBy(note => note.Id)
             .ToArray();
     }
 
@@ -78,6 +80,17 @@ public class NotesController : ControllerBase
             return NotFound($"Note with noteId {noteId} not found");
         }
 
+        // Check if the authenticated user is the author of the note.
+        var authorizationHeader = Request.Headers["Authorization"];
+        var user = BasicAuthenticationHandler.GetUserFrom(authorizationHeader);
+
+        if (note.Author != user.Username)
+        {
+            // Return a 403 Forbidden response if the user is not the author.
+            return Forbid();
+        }
+
+        // Return the note if the user is authorized.
         return Ok(note);
     }
 
